@@ -4449,25 +4449,12 @@ impl Editor {
         self.incremental_search_matches = Some(Vec::new());
     }
 
-    fn go_to_file(&self) -> Result<Dispatches, anyhow::Error> {
-        let paths: Vec<AbsolutePath> = self
-            .selection_set
-            .selections
-            .iter()
-            .map(|selection| {
-                self.buffer()
-                    .slice(&selection.extended_range())?
-                    .to_string()
-                    .try_into()
-            })
-            .collect::<anyhow::Result<Vec<AbsolutePath>>>()?;
-
+    fn open_paths(paths: Vec<AbsolutePath>) -> Result<Dispatches, anyhow::Error> {
         // When we have only one file to open, we do not mark it as we would most of the time want
         // a sneak-and-return usage. But, for multiple selections, since non-marked files don't
         // show up on the tab bar, it is better to mark them for visibility.
         //
         // @wongjiahau has termed this Behavioral Asymmetry.
-
         match paths.as_slice() {
             [] => Err(anyhow::anyhow!(
                 "Can't go to file. Requires atleast one selection to be made."
@@ -4482,6 +4469,45 @@ impl Editor {
                 Ok(Dispatches::one(Dispatch::OpenAndMarkFiles(paths)))
             }
         }
+    }
+
+    fn go_to_file(&self) -> Result<Dispatches, anyhow::Error> {
+        let paths: Vec<AbsolutePath> = self
+            .selection_set
+            .selections
+            .iter()
+            .map(|selection| {
+                self.buffer()
+                    .slice(&selection.extended_range())?
+                    .to_string()
+                    .try_into()
+            })
+            .collect::<anyhow::Result<Vec<AbsolutePath>>>()?;
+
+        return Editor::open_paths(paths);
+    }
+
+    fn go_to_file_relative(&self) -> Result<Dispatches, anyhow::Error> {
+        // Get the current file's path
+        let Some(current_path) = self.buffer().path() else {
+            return Err(anyhow::anyhow!("TODO"));
+        };
+        let paths: Vec<AbsolutePath> = self
+            .selection_set
+            .selections
+            .iter()
+            .map(|selection| {
+                let selection_path = self
+                    .buffer()
+                    .slice(&selection.extended_range())?
+                    .to_string();
+                let final_path_ = current_path.try_from();
+                let final_path = final_path_.join(selection_path);
+                return final_path.try_into();
+            })
+            .collect::<anyhow::Result<Vec<AbsolutePath>>>()?;
+
+        return Editor::open_paths(paths);
     }
 
     fn press_space(&self, context: &Context) -> Dispatches {
